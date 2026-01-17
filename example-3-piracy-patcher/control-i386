@@ -1,0 +1,6 @@
+Package: psx-piracy-patcher-example
+Version: 1.0
+Maintainer: Alex Free
+Architecture: i386
+Homepage: alex-free.github.io
+Description: Patches LibCrypt v1 in MediEvil Europe, and patches APv2 protection for other games. APv2 patch is gaurenteed to work if it is detected, but the patching method ONLY allows these games to run on a soft-modded console WITHOUT a non-stealth mod-chip.

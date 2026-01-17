@@ -1,0 +1,13 @@
+#!/bin/bash
+
+lib=lib-enigma-windows-i686
+#Compile Lib-Enigma For Windows i686.
+echo "Building Lib-Enigma For Windows i686..."
+
+
+cd "$(dirname $0)"
+rm -rf $lib
+mkdir $lib
+
+i686-w64-mingw32-gcc -D_LARGEFILE_SOURCE -D_FILE_OFFSET_BITS=64 -D_LARGEFILE64_SOURCE -Ofast -c lib-enigma.c -o $lib/lib-enigma.o
+i686-w64-mingw32-ar rcs $lib/libenigma.a $lib/lib-enigma.o

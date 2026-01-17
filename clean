@@ -1,0 +1,7 @@
+#!/bin/bash
+
+cd "$(dirname $0)"
+rm -rf lib-enigma-host lib-enigma-host-32-bit lib-enigma-mac-os lib-enigma-mac-os-legacy lib-enigma-windows-i686 lib-enigma-windows-x86_64
+make -C example-1-boot-file-printer clean-build
+make -C example-2-kings-field-1-english-translation-patcher clean-build
+make -C example-3-piracy-patcher clean-build

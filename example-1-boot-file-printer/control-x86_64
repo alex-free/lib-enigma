@@ -1,0 +1,6 @@
+Package: psx-bin-boot-file-printer
+Version: 1.0
+Maintainer: Alex Free
+Architecture: amd64
+Homepage: alex-free.github.io
+Description: Prints boot file name of a PSX CD image.

@@ -1,0 +1,13 @@
+#!/bin/bash
+
+lib=lib-enigma-host
+#Compile Lib-Enigma For Host (Linux).
+echo "Building Lib-Enigma For Host..."
+
+
+cd "$(dirname $0)"
+rm -rf $lib
+mkdir $lib
+
+gcc -D_LARGEFILE_SOURCE -D_FILE_OFFSET_BITS=64 -D_LARGEFILE64_SOURCE -Ofast -std=c99 -c lib-enigma.c -o $lib/lib-enigma.o
+ar rcs $lib/libenigma.a $lib/lib-enigma.o

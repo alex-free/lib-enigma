@@ -1,0 +1,14 @@
+#!/bin/bash
+
+lib=lib-enigma-mac-os
+#Compile Lib-Enigma For Mac.
+echo "Building Lib-Enigma For Mac OS..."
+
+
+cd "$(dirname $0)"
+rm -rf $lib
+mkdir $lib
+
+# -Ofast not avail in older clang.
+gcc -D_LARGEFILE_SOURCE -D_FILE_OFFSET_BITS=64 -D_LARGEFILE64_SOURCE -Ofast -std=c99 -c lib-enigma.c -o $lib/lib-enigma.o
+ar rcs $lib/libenigma.a $lib/lib-enigma.o
