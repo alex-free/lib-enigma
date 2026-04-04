@@ -21,7 +21,7 @@
 #define PREGAP 150
 
 // Identification.
-const char * get_psx_exe_gameid(char *volume_creation_timestamp);
+const char * get_psx_exe_gameid(FILE *bin, char *volume_creation_timestamp);
 int is_ps_cd(FILE *bin);
 void get_volume_creation_timestamp(FILE *bin, char *volume_creation_timestamp);
 int get_boot_file_name(FILE *bin, char *bootfile);

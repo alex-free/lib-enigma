@@ -2,12 +2,19 @@
 
 #include "lib-enigma.h"
 
+// Uncomment for Tonyhax International behavior of get_psx_exe_gameid().
+//#define IS_FOR_GAME_ID
+
 // Used by get_psx_gameid() and get_boot_file().
 bool is_scps = false;
 // We need to specify this as an intenral global var since we call it internally from get_boot_file().
 char volume_creation_timestamp[17];
 
-const char * get_psx_exe_gameid(char *volume_creation_timestamp)
+#if defined IS_FOR_GAME_ID
+    const char * get_psx_exe_gameid(char *volume_creation_timestamp)
+#else
+    const char * get_psx_exe_gameid(FILE *bin, char *volume_creation_timestamp)
+#endif
 {
     /*
     Special handling for PSX.EXE games with memcardpro. Currently this library support games that meet the below crtera:
@@ -242,7 +249,7 @@ const char * get_psx_exe_gameid(char *volume_creation_timestamp)
     } else if
 
     ( 
-    (strcmp( (char *)volume_creation_timestamp, "1995050116000000") == 0) || // Game no Tatsujin (Japan) (Rev 0) -http://redump.org/disc/36035/.
+    (strcmp( (char *)volume_creation_timestamp, "1995050116000000") == 0) || // Game no Tatsujin (Japan) (Rev 0) - http://redump.org/disc/36035/.
     (strcmp( (char *)volume_creation_timestamp, "1995060613000000") == 0) // Game no Tatsujin (Japan) (Rev 1) - http://redump.org/disc/37866/.
     ) {
         return "000.30"; // Using CD case serial. Uses 1 MC block - https://psxdatacenter.com/games/J/G/SLPS-00030.html.
@@ -338,14 +345,33 @@ const char * get_psx_exe_gameid(char *volume_creation_timestamp)
 
     // SLPS_00054 Yaoi Jun'ichi Gokuhi Project: UFO o Oe!! (Japan) - http://redump.org/disc/28631/ has proper bootfile 'SLPS_000.54'.
 
-    ( 
-    (strcmp( (char *)volume_creation_timestamp, "1995060504013600") == 0) || // Cyberwar (Japan) (Disc 1) - http://redump.org/disc/30637/.
-    (strcmp( (char *)volume_creation_timestamp, "1995060319142200") == 0) || // Cyberwar (Japan) (Disc 2) - http://redump.org/disc/30638/.
-    (strcmp( (char *)volume_creation_timestamp, "1995060402110800") == 0) // Cyberwar (Japan) (Disc 3) - http://redump.org/disc/30639/.
-    ) {
-        return "000.55"; // Using Disc 1 CD case serial: http://redump.org/disc/30637/. All CDs assigned to same memory card. SLPS_00056 is Disc 2, and SLPS_00057 is Disc 3. Uses 1 MC block - https://psxdatacenter.com/games/J/C/SLPS-00055.html.
-    } else if
+    #if defined IS_FOR_GAME_ID
+        // We need one GameID sent so that all discs can acccess the same memory card image.
 
+        ( 
+        (strcmp( (char *)volume_creation_timestamp, "1995060504013600") == 0) || // Cyberwar (Japan) (Disc 1) - http://redump.org/disc/30637/.
+        (strcmp( (char *)volume_creation_timestamp, "1995060319142200") == 0) || // Cyberwar (Japan) (Disc 2) - http://redump.org/disc/30638/.
+        (strcmp( (char *)volume_creation_timestamp, "1995060402110800") == 0) // Cyberwar (Japan) (Disc 3) - http://redump.org/disc/30639/.
+        ) {
+            return "000.55"; // Using Disc 1 CD case serial: http://redump.org/disc/30637/. All CDs assigned to same memory card. SLPS_00056 is Disc 2, and SLPS_00057 is Disc 3. Uses 1 MC block - https://psxdatacenter.com/games/J/C/SLPS-00055.html.
+        } else if
+
+    #else
+
+        (strcmp((char *)volume_creation_timestamp, "1995060504013600") == 0) { // Cyberwar (Japan) (Disc 1)
+            return "000.55";
+        } else if
+
+        (strcmp((char *)volume_creation_timestamp, "1995060319142200") == 0) { // Cyberwar (Japan) (Disc 2)
+            return "000.56";
+        } else if
+
+        (strcmp((char *)volume_creation_timestamp, "1995060402110800") == 0) { // Cyberwar (Japan) (Disc 3)
+            return "000.57";
+        } else if
+
+    #endif
+    
     // SLPS_0058 Ide Yousuke no Mahjong Kazoku (Japan) (Rev 0) - http://redump.org/disc/34169/ and Ide Yousuke no Mahjong Kazoku (Japan) (Rev 1) - http://redump.org/disc/33562/ have a proper bootfile 'SLPS_000.58'.
 
     (strcmp( (char *)volume_creation_timestamp, "1995081612000000") == 0) { // Taikyoku Shougi: Kiwame (Japan) - http://redump.org/disc/35288/.
@@ -404,10 +430,25 @@ const char * get_psx_exe_gameid(char *volume_creation_timestamp)
         return "000.70"; // Serial from CD case. Uses 1 MC block - https://psxdatacenter.com/games/J/S/SLPS-00070.html.
     } else if
 
-    (strcmp( (char *)volume_creation_timestamp, "1995040719355400") == 0) { // 3x3 Eyes: Kyuusei Koushu (Disc 1) (Japan) - http://redump.org/disc/7881/ / 3x3 Eyes: Kyuusei Koushu (Disc 2) (Japan) http://redump.org/disc/7880/.
-        return "000.71"; // Using disc 1 CD case serial: http://redump.org/disc/7881/. Disc 2 serial is SLPS_00072. All CDs assigned to same memory card.
-        //debug_write("3x3 Eyes: Kyuusei Koushu (Disc 1) (Japan) / (Disc 2)"); // 1 MC block - https://psxdatacenter.com/games/J/0-9/SLPS-00071.html.
-    } else if
+    #if defined IS_FOR_GAME_ID
+        // We need one GameID sent so that all discs can acccess the same memory card image. With lib-enigma that isn't useful and we instead want to identify each disc.
+        
+        (strcmp( (char *)volume_creation_timestamp, "1995040719355400") == 0) { // 3x3 Eyes: Kyuusei Koushu (Disc 1) (Japan) - http://redump.org/disc/7881/ / 3x3 Eyes: Kyuusei Koushu (Disc 2) (Japan) http://redump.org/disc/7880/.
+            return "000.71"; // Using disc 1 CD case serial: http://redump.org/disc/7881/. Disc 2 serial is SLPS_00072. All CDs assigned to same memory card.
+            //debug_write("3x3 Eyes: Kyuusei Koushu (Disc 1) (Japan) / (Disc 2)"); // 1 MC block - https://psxdatacenter.com/games/J/0-9/SLPS-00071.html.
+        } else if
+
+    #else
+
+        (strcmp((char *)volume_creation_timestamp, "1995040719355400") == 0) { // 3x3 Eyes - Kyuusei Koushu (Japan) (Disc 1)
+            return "000.71";
+        } else if
+
+        (strcmp((char *)volume_creation_timestamp, "1995040719355400") == 0) { // 3x3 Eyes - Kyuusei Koushu (Japan) (Disc 2)
+            return "000.72";
+        } else if
+
+    #endif
 
     (strcmp( (char *)volume_creation_timestamp, "1995061806364400") == 0) { // Dragon Ball Z: Ultimate Battle 22 (Japan) - http://redump.org/disc/10992/.
         return "000.73"; // Serial from CD case.
@@ -481,12 +522,28 @@ const char * get_psx_exe_gameid(char *volume_creation_timestamp)
         return "000.93"; // CD case serial. Uses 1 MC block - https://psxdatacenter.com/games/J/O/SLPS-00093.html.
     } else if
 
-    ( 
-    (strcmp( (char *)volume_creation_timestamp, "1995090510000000") == 0) || // Thunder Storm & Road Blaster (Disc 1) (Thunder Storm) (Japan) - http://redump.org/disc/6740/.
-    (strcmp( (char *)volume_creation_timestamp, "1995083123000000") == 0) // Thunder Storm & Road Blaster (Disc 2) (Road Blaster) (Japan) - http://redump.org/disc/8551/.
-    ) {
-        return "000.94"; // Serial from Disc 1 CD case. Disc 2 serial is SLPS_00095. Uses 1 MC block - https://psxdatacenter.com/games/J/T/SLPS-00094.html.
-    } else if
+    #if defined IS_FOR_GAME_ID
+        //We need one GameID sent so that all discs can acccess the same memory card image. With lib-enigma that isn't useful and we instead want to identify each disc.
+
+        ( 
+        (strcmp( (char *)volume_creation_timestamp, "1995090510000000") == 0) || // Thunder Storm & Road Blaster (Disc 1) (Thunder Storm) (Japan) - http://redump.org/disc/6740/.
+        (strcmp( (char *)volume_creation_timestamp, "1995083123000000") == 0) // Thunder Storm & Road Blaster (Disc 2) (Road Blaster) (Japan) - http://redump.org/disc/8551/.
+        ) {
+            return "000.94"; // Serial from Disc 1 CD case. Disc 2 serial is SLPS_00095. Uses 1 MC block - https://psxdatacenter.com/games/J/T/SLPS-00094.html.
+        } else if
+    
+    #else
+
+        (strcmp((char *)volume_creation_timestamp, "1995090510000000") == 0) { // Thunder Storm & Road Blaster (Japan) (Disc 1) (Thunder Storm)
+            return "000.94";
+        } else if
+
+
+        (strcmp((char *)volume_creation_timestamp, "1995083123000000") == 0) { // Thunder Storm & Road Blaster (Japan) (Disc 2) (Road Blaster)
+            return "000.95";
+        } else if
+
+    #endif
 
     // SLPS_00096 Game no Tetsujin: The Shanghai (Japan) - http://redump.org/disc/36470/ has a proper bootfile 'SLPS_000.96".
 
@@ -574,13 +631,32 @@ const char * get_psx_exe_gameid(char *volume_creation_timestamp)
 
     // SLPS_0132 Gionbana (Japan) - http://redump.org/disc/33539/ has a proper bootfile 'SLPS_001.32'.
 
-    ( 
-    (strcmp( (char *)volume_creation_timestamp, "1995102101350000") == 0) || // D no Shokutaku: Complete Graphics (Japan) (Disc 1) - http://redump.org/disc/763/.
-    (strcmp( (char *)volume_creation_timestamp, "1995102102521200") == 0) || // D no Shokutaku: Complete Graphics (Japan) (Disc 2) - http://redump.org/disc/764/.
-    (strcmp( (char *)volume_creation_timestamp, "1995102105003200") == 0) // D no Shokutaku: Complete Graphics (Japan) (Disc 3) - http://redump.org/disc/765/.
-    ) {
-        return "001.33"; // Using disc 1 CD case serial: http://redump.org/disc/763/. Disc 2 serial is SLPS_00134. Disc 3 serial is SLPS_0135 All CDs assigned to same memory card. Use 13 MC blocks - https://psxdatacenter.com/games/J/D/SLPS-00133.html.
-    } else if     
+    #if defined IS_FOR_GAME_ID
+        // We need one GameID sent so that all discs can acccess the same memory card image. With lib-enigma that isn't useful and we instead want to identify each disc.
+
+        ( 
+        (strcmp( (char *)volume_creation_timestamp, "1995102101350000") == 0) || // D no Shokutaku: Complete Graphics (Japan) (Disc 1) - http://redump.org/disc/763/.
+        (strcmp( (char *)volume_creation_timestamp, "1995102102521200") == 0) || // D no Shokutaku: Complete Graphics (Japan) (Disc 2) - http://redump.org/disc/764/.
+        (strcmp( (char *)volume_creation_timestamp, "1995102105003200") == 0) // D no Shokutaku: Complete Graphics (Japan) (Disc 3) - http://redump.org/disc/765/.
+        ) {
+            return "001.33"; // Using disc 1 CD case serial: http://redump.org/disc/763/. Disc 2 serial is SLPS_00134. Disc 3 serial is SLPS_0135 All CDs assigned to same memory card. Use 13 MC blocks - https://psxdatacenter.com/games/J/D/SLPS-00133.html.
+        } else if     
+
+    #else
+
+        (strcmp( (char *)volume_creation_timestamp, "1995102101350000") == 0) { // D no Shokutaku: Complete Graphics (Japan) (Disc 1) - http://redump.org/disc/763/.
+            return "001.33"; // Serial from CD case.
+        } else if
+
+        (strcmp( (char *)volume_creation_timestamp, "1995102102521200") == 0) { // D no Shokutaku: Complete Graphics (Japan) (Disc 2) - http://redump.org/disc/764/.
+            return "001.34"; // Serial from CD case.
+        } else if
+
+        (strcmp( (char *)volume_creation_timestamp, "1995102105003200") == 0) { // D no Shokutaku: Complete Graphics (Japan) (Disc 3) - http://redump.org/disc/765/ .
+            return "001.35"; // Serial from CD case.
+        } else if
+
+    #endif
 
     // SLPS_00136 Othello World II: Yume to Michi e no Chousen (Japan) - http://redump.org/disc/41764/ has a proper bootfile 'SLPS_001.36'.
 
@@ -624,20 +700,145 @@ const char * get_psx_exe_gameid(char *volume_creation_timestamp)
         return "001.52"; // Serial from CD case. Uses 1 MC block - https://psxdatacenter.com/games/J/Y/SLPS-00152.html.
     } else if
 
+    (strcmp((char *)volume_creation_timestamp, "1995051201000000") == 0) { // Aquanaut no Kyuujitsu (Japan)
+        return "000.60";
+    } else if
+
+    (strcmp((char *)volume_creation_timestamp, "1995061911303400") == 0) { // J.League Jikkyou Winning Eleven (Japan)
+        return "000.68";
+    } else if
+
     // TODO, check until at least SLPS_00173 for any more stragglers.
 
     (strcmp( (char *)volume_creation_timestamp, "1995121620000000") == 0) { // Alnam no Kiba: Juuzoku Juuni Shinto Densetsu (Japan) - http://redump.org/disc/11199/
         return "001.73"; // Serial from CD case. Uses 1 MC block - https://psxdatacenter.com/games/J/A/SLPS-00173.html.
     } else if
 
-    // SLPS_00719 The Great Battle VI (Japan) - http://redump.org/disc/37406/ has PSX.EXE. But it does not use memory cards (no save functionallity) https://psxdatacenter.com/games/J/T/SLPS-00719.html.
+    (strcmp((char *)volume_creation_timestamp, "1995070302000000") == 0) { // Gakkou no Kowai Uwasa - Hanako-san ga Kita!! (Japan)
+        return "000.78";
+    } else if
+
+    (strcmp((char *)volume_creation_timestamp, "1995051709402500") == 0) { // Eisei Meijin (Japan)
+        return "000.90";
+    } else if
+
+    (strcmp((char *)volume_creation_timestamp, "1995053117000000") == 0) { // Exector (Japan)
+        return "000.91";
+    } else if
+
+    (strcmp((char *)volume_creation_timestamp, "1995081100000000") == 0) { // King of Bowling (Japan)
+        return "000.92";
+    } else if
+
+    (strcmp((char *)volume_creation_timestamp, "1995071011035200") == 0) { // Oh-chan no Oekaki Logic (Japan)
+        return "000.93";
+    } else if
+
+    (strcmp((char *)volume_creation_timestamp, "1995081500000000") == 0) { // Game no Tetsujin - The Shanghai (Japan)
+        return "000.96";
+    } else if
+
+    (strcmp((char *)volume_creation_timestamp, "1995081001450000") == 0) { // Universal-ki Kanzen Kaiseki - Pachi-Slot Simulator (Japan)
+        return "001.01";
+    } else if
+
+    (strcmp((char *)volume_creation_timestamp, "1995080316000000") == 0) { // V-Tennis (Japan)
+        return "001.03";
+    } else if
+
+    (strcmp((char *)volume_creation_timestamp, "1995081020000000") == 0) { // Gouketsuji Ichizoku 2 - Chotto dake Saikyou Densetsu (Japan)
+        return "001.04";
+    } else if
+
+    (strcmp((char *)volume_creation_timestamp, "1995090722000000") == 0) { // Darkseed (Japan)
+        return "001.08";
+    } else if
+
+    (strcmp((char *)volume_creation_timestamp, "1995082016003000") == 0) { // Makeruna! Makendou 2 (Japan)
+        return "001.28";
+    } else if
+
+    (strcmp((char *)volume_creation_timestamp, "1995102101350000") == 0) { // D no Shokutaku - Complete Graphics (Japan) (Disc 1)
+        return "001.33";
+    } else if
+
+    (strcmp((char *)volume_creation_timestamp, "1995092205430500") == 0) { // Yaku - Yuujou Dangi (Japan)
+        return "001.52";
+    } else if
+
+    (strcmp((char *)volume_creation_timestamp, "1995121620000000") == 0) { // Alnam no Kiba - Juuzoku Juuni Shinto Densetsu (Japan)
+        return "001.73";
+    } else if
+
+    (strcmp((char *)volume_creation_timestamp, "1995122811000000") == 0) { // Welcome House (Japan)
+        return "001.90";
+    } else if
+
+    (strcmp((char *)volume_creation_timestamp, "1995111622323000") == 0) { // Magical Drop (Japan)
+        return "002.01";
+    } else if
+
+    (strcmp((char *)volume_creation_timestamp, "1995121418400300") == 0) { // CG Mukashi Banashi - Jiisan 2-do Bikkuri!! (Japan)
+        return "002.30";
+    } else if
+
+    (strcmp((char *)volume_creation_timestamp, "1996022700000000") == 0) { // Tetris X (Japan)
+        return "003.21";
+    } else if
+
+    (strcmp((char *)volume_creation_timestamp, "1996030619500500") == 0) { // Nobunaga Shippuuki - Kirameki (Japan)
+        return "003.37";
+    } else if
+
+    (strcmp((char *)volume_creation_timestamp, "1996072211000000") == 0) { // DigiCro - Digital Number Crossword (Japan)
+        return "005.49";
+    } else if
+
+    (strcmp((char *)volume_creation_timestamp, "1997011500000000") == 0) { // Great Battle VI, The (Japan)
+        return "007.19";
+    } else if
+
+    (strcmp((char *)volume_creation_timestamp, "1997031012200700") == 0) { // FIFA Soccer 97 (Japan)
+        return "008.78";
+    } else if
+
+    (strcmp((char *)volume_creation_timestamp, "1997050817540700") == 0) { // Over Drivin' II (Japan)
+        return "008.95";
+    } else if
+
+    (strcmp((char *)volume_creation_timestamp, "1998061000000000") == 0) { // Himitsu Kessha Q (Japan)
+        return "013.34";
+    } else if
+
+    (strcmp((char *)volume_creation_timestamp, "1998040820350000") == 0) { // Crown Knights, The - Jaja-uma! Quartet - Mega Dream Destruction+ (Japan)
+        return "015.58";
+    } else if
+
+    (strcmp((char *)volume_creation_timestamp, "1999111108000000") == 0) { // Koudelka (Japan) (Disc 1)
+        return "024.60";
+    } else if
 
     // Begin SCPS.
+
+    (strcmp((char *)volume_creation_timestamp, "1994112112000000") == 0) { // Motor Toon Grand Prix (Japan)
+        is_scps = true;
+        return "100.01";
+    } else if
 
     (strcmp( (char *)volume_creation_timestamp, "1995030717020700") == 0) { // Victory Zone (Japan) - http://redump.org/disc/37010/.
         is_scps = true;
         return "100.02"; // Using CD case serial. Uses 2 MC blocks - https://psxdatacenter.com/games/J/V/SCPS-10002.html.
         // TESTING NOTE: Latest DuckStation as of 9/11/2024 doesn't work with this game, but v0.1-6292 does just fine.
+    } else if
+
+    (strcmp((char *)volume_creation_timestamp, "1994103110000000") == 0) { // Crime Crackers (Japan)
+        is_scps = true;
+        return "100.03";
+    } else if
+
+    (strcmp((char *)volume_creation_timestamp, "1995032500000000") == 0) { // Gunners Heaven (Japan)
+        is_scps = true;
+        return "100.06";
     } else if
 
     (strcmp( (char *)volume_creation_timestamp, "1995032400000000") == 0) { // Jumping Flash! Aloha Danshaku Funky Daisakusen no Maki (Japan) - http://redump.org/disc/4051/.
@@ -648,7 +849,37 @@ const char * get_psx_exe_gameid(char *volume_creation_timestamp)
     (strcmp( (char *)volume_creation_timestamp, "1995052420065100") == 0) { // Arc the Lad (Japan) (Rev 0) - http://redump.org/disc/67966/ / Arc the Lad (Japan) (Rev 1) - http://redump.org/disc/1472/
         is_scps = true;
         return "100.08"; // Serial from Rev 0 CD case. Rev 1 serial is SLPS_00095. Uses 1 MC block - https://psxdatacenter.com/games/J/A/SCPS-10008.html.
+    } else if
 
+    (strcmp((char *)volume_creation_timestamp, "1995061723590000") == 0) { // Philosoma (Japan)
+        is_scps = true;
+        return "100.09";
+    } else if
+
+    (strcmp((char *)volume_creation_timestamp, "1995080914422700") == 0) { // Wizardry VII - Guardia no Houju (Japan)
+        is_scps = true;
+        return "100.10";
+    } else if
+    
+    (strcmp((char *)volume_creation_timestamp, "1995071219364500") == 0) { // Hermie Hopperhead - Scrap Panic (Japan)
+        is_scps = true;
+        return "100.12";
+    } else if
+
+    (strcmp((char *)volume_creation_timestamp, "1995092719000000") == 0) { // Beyond the Beyond - Haruka naru Kanaan e (Japan)
+        is_scps = true;
+        return "100.14";
+    } else if
+
+    (strcmp((char *)volume_creation_timestamp, "1995103122331500") == 0) { // Horned Owl (Japan)
+        is_scps = true;
+        return "100.16";
+    } else if
+
+    (strcmp((char *)volume_creation_timestamp, "1997082616350500") == 0) { // XI [sai] (Japan) (En,Ja)
+        is_scps = true;
+        return "100.51";
+    
     } else {
         return "0"; // If not known say its "0".
     }
@@ -919,7 +1150,7 @@ Note: Multi-disc games have more than one game code. The game code for Disc 1 is
         //printf("Volume Creation TimeStamp (Unique Identifier):\n%s\n", volume_creation_timestamp);
 
         // Attempt to figure out what PSX.EXE game this is based off of volume_creation_timestamp.
-        const char * serial = get_psx_exe_gameid(volume_creation_timestamp);
+        const char * serial = get_psx_exe_gameid(bin, volume_creation_timestamp);
         //printf("Serial: %s\n", serial);
         
         if(strcmp(serial, "0") == 0) 

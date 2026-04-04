@@ -49,9 +49,11 @@ int main (int argc, const char * argv[])
                     printf("Unknown version\n");
                 }
             }
+
         } else if(got_boot_file == 2) { // PSX.EXE game that is not yet in the data base.
             char volume_creation_timestamp[16];
             get_volume_creation_timestamp(bin, volume_creation_timestamp);
+            printf("Game not yet in database, please report timestamp:\n");
             printf("%s\n", volume_creation_timestamp);
         } else {
             printf("Could not id %s\n", argv[1]);
