@@ -419,7 +419,10 @@ char volume_creation_timestamp[17];
         return "000.68"; // Uses 1 MC block - https://psxdatacenter.com/games/J/J/SLPS-00068.html.
     } else if
 
-    (strcmp( (char *)volume_creation_timestamp, "1995061806364400") == 0) { // King's Field II (Japan) - http://redump.org/disc/5892/.
+    (
+    (strcmp( (char *)volume_creation_timestamp, "1995061207000000") == 0) || // King's Field II (Japan) - http://redump.org/disc/5892/.
+    (strcmp( (char *)volume_creation_timestamp, "1995061806364400") == 0) // King's Field II (Japan) (PlayStation The Best) (Rev 0) - http://redump.org/disc/7073/ / King's Field II (Japan) (PlayStation The Best) (Rev 1) - http://redump.org/disc/13338/.
+    ) {
         return "000.69"; // Uses 2-15 MC blocks - https://psxdatacenter.com/games/J/K/SLPS-00069.html.
     } else if
     
@@ -744,8 +747,16 @@ char volume_creation_timestamp[17];
         return "002.30"; // Uses 1 MC block - https://psxdatacenter.com/games/J/C/SLPS-00230.html.
     } else if
 
+    (strcmp((char *)volume_creation_timestamp, "1996010800000000") == 0) { // Sotsugyou R: Graduation Real (Japan) - http://redump.org/disc/7892/
+        return "002.61"; // Uses 2 MC blocks - https://psxdatacenter.com/games/J/S/SLPS-00261.html.
+    } else if
+
     (strcmp((char *)volume_creation_timestamp, "1996022700000000") == 0) { // Tetris X (Japan) - http://redump.org/disc/35855/.
         return "003.21"; // Uses 1 MC block - https://psxdatacenter.com/games/J/T/SLPS-00321.html.
+    } else if
+
+    (strcmp((char *)volume_creation_timestamp, "1996020413401600") == 0) { // Sid Meier's Civilization: Shin Sekai Shichidai Bunmei (Japan) - http://redump.org/disc/5607/.
+        return "003.36"; // Uses 1 MC block - https://psxdatacenter.com/games/J/C/SLPS-00336.html.
     } else if
 
     (strcmp((char *)volume_creation_timestamp, "1996030619500500") == 0) { // Nobunaga Shippuuki - Kirameki (Japan) - http://redump.org/disc/30963/.
