@@ -1,6 +1,135 @@
 // PlayStation 1 and 2 CD Image Identification/Patching Library (LIB ENIGMA) by Alex Free (3-BSD license)
 
+/*
+BSD 3-Clause License
+Copyright (c) 2026, Alex Free
+All rights reserved.
+Redistribution and use in source and binary forms, with or without
+modification, are permitted provided that the following conditions are met:
+* Redistributions of source code must retain the above copyright notice, this
+  list of conditions and the following disclaimer.
+* Redistributions in binary form must reproduce the above copyright notice,
+  this list of conditions and the following disclaimer in the documentation
+  and/or other materials provided with the distribution.
+* Neither the name of the copyright holder nor the names of its
+  contributors may be used to endorse or promote products derived from
+  this software without specific prior written permission.
+THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
+AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE
+FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR
+SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER
+CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
+OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
+OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+*/
+
 #include "lib-enigma.h"
+
+unsigned int total_number_of_sectors(FILE *bin)
+{
+    fseek(bin, 0, SEEK_END);
+    unsigned int bin_file_size = ftell(bin);
+    unsigned int total_number_of_sectors = (bin_file_size / SECTOR_RAW_LEN);
+    fseek(bin, 0, SEEK_END);
+    return total_number_of_sectors;
+}
+
+int read_sector_raw(FILE *bin, unsigned int sector_number, unsigned char * sector_buf)
+{
+    unsigned int sector_sum = total_number_of_sectors(bin);
+
+    if(sector_sum < sector_number)
+    {
+        return 2;
+    }
+
+    unsigned int sector_offset = (SECTOR_RAW_LEN * sector_number);
+    fseek(bin, 0, SEEK_SET);
+    fseek(bin, sector_offset, SEEK_SET);
+    unsigned int ret = fread(sector_buf, 1, SECTOR_RAW_LEN, bin); // Not big endian safe.
+    fseek(bin, 0, SEEK_SET); // Always seek to initial fpos as per policy of this library.
+    
+    if(ret == SECTOR_RAW_LEN)
+    {
+        return 1;
+    } else {
+        return 0;
+    }
+}
+
+int read_sector_user_data(FILE *bin, unsigned int sector_number, unsigned char * sector_buf)
+{
+    unsigned int sector_sum = total_number_of_sectors(bin);
+
+    if(sector_sum < sector_number)
+    {
+        return 2;
+    }
+
+    unsigned int sector_offset = (SECTOR_RAW_LEN * sector_number) + SECTOR_SYNC_HEADER_LEN;
+    fseek(bin, 0, SEEK_SET);
+    fseek(bin, sector_offset, SEEK_SET);
+    unsigned int ret = fread(sector_buf, 1, SECTOR_USER_DATA_LEN, bin); // Not big endian safe.
+    fseek(bin, 0, SEEK_SET); // Always seek to initial fpos as per policy of this library.
+
+    if(ret == SECTOR_USER_DATA_LEN)
+    {
+        return 1;
+    } else {
+        return 0;
+    }
+}
+
+int read_sector_edc(FILE *bin, unsigned int sector_number, unsigned char * sector_buf)
+{
+    unsigned int sector_sum = total_number_of_sectors(bin);
+
+    if(sector_sum < sector_number)
+    {
+        return 2;
+    }
+
+    unsigned int sector_offset = (SECTOR_RAW_LEN * sector_number) + (SECTOR_SYNC_HEADER_LEN + SECTOR_USER_DATA_LEN);
+    fseek(bin, 0, SEEK_SET);
+    fseek(bin, sector_offset, SEEK_SET);
+    unsigned int ret = fread(sector_buf, 1, SECTOR_EDC_LEN, bin); // Not big endian safe.
+    fseek(bin, 0, SEEK_SET); // Always seek to initial fpos as per policy of this library.
+    
+    if(ret == SECTOR_EDC_LEN)
+    {
+        return 1;
+    } else {
+        return 0;
+    }
+}
+
+int read_sector_ecc(FILE *bin, unsigned int sector_number, unsigned char * sector_buf)
+{
+    unsigned int sector_sum = total_number_of_sectors(bin);
+
+    if(sector_sum < sector_number)
+    {
+        return 2;
+    }
+
+    unsigned int sector_offset = (SECTOR_RAW_LEN * sector_number) + (SECTOR_SYNC_HEADER_LEN + SECTOR_USER_DATA_LEN + SECTOR_EDC_LEN);
+    fseek(bin, 0, SEEK_SET);
+    fseek(bin, sector_offset, SEEK_SET);
+    unsigned int ret = fread(sector_buf, 1, SECTOR_ECC_LEN, bin); // Not big endian safe.
+    fseek(bin, 0, SEEK_SET); // Always seek to initial fpos as per policy of this library.
+    
+    if(ret == SECTOR_ECC_LEN)
+    {
+        return 1;
+    } else {
+        return 0;
+    }
+}
+
+// Now begin get_psx_exe_gameid(). Note because this is a 'parser' function it doesn't seek the file at all right now. If there were to ever arrise a volume_creation_timestamp conflict, then id_rev() could be used to destingush the file since we already require FILE *bin as first argument in lib-enigma mode. In that case, fpos would be reset to initial 0 before returing the game id for each game.
 
 // Uncomment for Tonyhax International behavior of get_psx_exe_gameid().
 //#define IS_FOR_GAME_ID
@@ -879,6 +1008,8 @@ int cdr_minimum_requirement(FILE *bin)
     } else if( (bin_size % SECTOR_RAW_LEN) > 360000) {
         return 2;
     }
+    
+    fseek(bin, 0, SEEK_SET); // Always seek to initial fpos as per policy of this library.
 }
 
 int is_ps_cd(FILE *bin)
@@ -1013,7 +1144,7 @@ Note: Multi-disc games have more than one game code. The game code for Disc 1 is
             //printf("Directory Sector Multi: %d\n", (directory_record_sector * 0x800)) ;
         }
         
-        fseek(bin, (SECTOR_EDC_ECC_LEN + SECTOR_SYNC_HEADER_LEN), SEEK_CUR); // skip EDC/EEC/Header
+        fseek(bin, (SECTOR_EDC_LEN + SECTOR_ECC_LEN + SECTOR_SYNC_HEADER_LEN), SEEK_CUR); // skip EDC/EEC/Header
     }
     
     //Go to root directory record sector (22). Sector 22 = 0x930 * 22 = 0xCA20 + 0x18 (sync header) = 0xCA38 (start of user data 
@@ -1244,11 +1375,11 @@ void bin_patch(FILE *bin,
 
     fseek(bin, 0, SEEK_END);
     bin_file_size = ftell(bin);
-    unsigned int total_number_of_sectors = (bin_file_size / SECTOR_RAW_LEN);
+    unsigned int sector_sum = total_number_of_sectors(bin);
 
     unsigned char sectors[(SECTOR_USER_DATA_LEN * 2)];
     
-    printf("Scanning %d sectors, please wait...\n", total_number_of_sectors);
+    printf("Scanning %d sectors, please wait...\n", sector_sum);
     fseek(bin, 0, SEEK_SET);
     fread(sectors_buf, 1, (SECTOR_RAW_LEN * 2), bin);
 
@@ -1264,7 +1395,7 @@ void bin_patch(FILE *bin,
             last_sector = true; // This function is reading 2 sectors at a time, so if there is an odd number of sectors we have to change the behavior to only search the last sector. Explicitly break loop when this is set.
         }
         
-        percentage = ( ( (sector_count + 1) * 100) / total_number_of_sectors); // + 1 to ensure it gets to 100%
+        percentage = ( ( (sector_count + 1) * 100) / sector_sum); // + 1 to ensure it gets to 100%
         printf("\rProgress: %d%%", percentage); // last sector so don't add + 1
         fflush(stdout); // clear double buffered input so terminal cursor isn't going nuts
         
@@ -1402,7 +1533,7 @@ void bin_patch(FILE *bin,
             #endif
 
             // Skip EDC/EDC, we are currently at cur + 0x18 + 0x800
-            fseek(bin, SECTOR_EDC_ECC_LEN, SEEK_CUR);
+            fseek(bin, (SECTOR_EDC_LEN + SECTOR_ECC_LEN), SEEK_CUR);
             #ifdef DEBUG
                 printf("\nSkipped EDC/ECC. Now at next sector. Current offset: 0x%lX\n", ftell(bin));
             #endif
@@ -1420,7 +1551,7 @@ void bin_patch(FILE *bin,
             #endif
 
             // skip EDC/EEC
-            fseek(bin, SECTOR_EDC_ECC_LEN, SEEK_CUR);
+            fseek(bin, (SECTOR_EDC_LEN + SECTOR_ECC_LEN), SEEK_CUR);
             #ifdef DEBUG
                 printf("Skipped EDC/ECC. Now at next sector. Current offset: 0x%lX\n", ftell(bin));
             #endif
@@ -1470,7 +1601,7 @@ void bin_patch(FILE *bin,
             #endif
 
             // skip EDC/EEC
-            fseek(bin, SECTOR_EDC_ECC_LEN, SEEK_CUR);
+            fseek(bin, (SECTOR_EDC_LEN + SECTOR_ECC_LEN), SEEK_CUR);
             #ifdef DEBUG
                 printf("\nSkipped EDC/ECC. Now at end of file. Current offset: 0x%lX\n", ftell(bin));
             #endif    

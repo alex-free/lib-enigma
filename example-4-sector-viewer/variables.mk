@@ -2,14 +2,14 @@
 # https://github.com/alex-free/ezre
 
 # REQUIRED: executable name in release (.exe file extension is appended for Windows builds). I.e. hello.
-PROGRAM=psxpiracyp
+PROGRAM=secviewer
 # REQUIRED: Version number, passed as 'VERSION' string to $(SOURCE_FILES). I.e. 1.0. Prepended with a v.
 VERSION=1.0.2
 # REQUIRED: source files to be compiled into $(PROGRAM) target. Can use wildcard (i.e. *.c, *.cpp, etc) or specify files specifically. These files are looked for in the same directory that the EZRE `Makefile` and `variables.mk` files are in (relative).
 SOURCE_FILES=example.c
 
 # REQUIRED: Basename of all release files (.zip, .deb). I.e. hello-world.
-RELEASE_BASE_NAME=psx-piracy-patcher-example
+RELEASE_BASE_NAME=sector-view
 # REQUIRED: Appended to end of release file name. Release file format is $(RELEASE_BASE_NAME)-$(VERSION)-$(RELEASE_NAME_SUFFIX).
 RELEASE_NAME_SUFFIX_HOST_32=linux-i386-static
 RELEASE_NAME_SUFFIX_HOST=linux-x86_64-static
@@ -23,7 +23,7 @@ RELEASE_NAME_SUFFIX_MAC_OS_LEGACY=mac-os-$(shell uname -p)
 RELEASE_FILES=
 
 # For RPM and DNF packages:
-SOFTWARE_DESCRIPTION=Patches LibCrypt v1 in MediEvil Europe, and patches APv2 protection for other games. APv2 patch is gaurenteed to work if it is detected, but the patching method ONLY allows these games to run on a soft-modded console WITHOUT a non-stealth mod-chip.
+SOFTWARE_DESCRIPTION=View sector data in cd images.
 YOUR_NAME=Alex Free
 WEBSITE=alex-free.github.io
 LICENSE=3-BSD

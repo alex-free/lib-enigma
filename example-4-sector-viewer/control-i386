@@ -1,0 +1,6 @@
+Package: sector-view
+Version: 1.0.2
+Maintainer: Alex Free
+Architecture: i386
+Homepage: alex-free.github.io
+Description: View sector data in cd images.

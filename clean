@@ -5,3 +5,4 @@ rm -rf lib-enigma-host lib-enigma-host-32-bit lib-enigma-mac-os lib-enigma-mac-o
 make -C example-1-boot-file-printer clean-build
 make -C example-2-kings-field-1-english-translation-patcher clean-build
 make -C example-3-piracy-patcher clean-build
+make -C example-4-sector-viewer clean-build

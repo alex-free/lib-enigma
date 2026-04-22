@@ -1,4 +1,4 @@
-# This GNUMakefile is part of the EzRe build system v1.1.5.
+# This GNUMakefile is part of the EzRe build system v1.1.6.
 # https://github.com/alex-free/ezre
 
 include variables.mk
@@ -16,6 +16,7 @@ endif
 
 # Append DEFINE VERSION flag. We do the others later after we build them up a bit more.
 COMPILER_FLAGS_HOST := $(COMPILER_FLAGS_HOST) -DVERSION=\"$(VERSION)\"
+COMPILER_FLAGS_HOST_32_BIT := $(COMPILER_FLAGS_HOST_32_BIT) -DVERSION=\"$(VERSION)\"
 COMPILER_FLAGS_MAC := $(COMPILER_FLAGS_MAC) -DVERSION=\"$(VERSION)\"
 
 # Optionals that need to be set to something (all others may be empty).
