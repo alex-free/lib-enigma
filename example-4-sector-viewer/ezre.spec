@@ -1,5 +1,5 @@
 Name: sector-view       
-Version: v1.0.2
+Version: v1.0.3
 Summary: View sector data in cd images.
 Release: 1
 License: 3-BSD

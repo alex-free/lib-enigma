@@ -33,7 +33,7 @@ unsigned int total_number_of_sectors(FILE *bin)
     fseek(bin, 0, SEEK_END);
     unsigned int bin_file_size = ftell(bin);
     unsigned int total_number_of_sectors = (bin_file_size / SECTOR_RAW_LEN);
-    fseek(bin, 0, SEEK_END);
+    fseek(bin, 0, SEEK_SET);
     return total_number_of_sectors;
 }
 
@@ -47,7 +47,6 @@ int read_sector_raw(FILE *bin, unsigned int sector_number, unsigned char * secto
     }
 
     unsigned int sector_offset = (SECTOR_RAW_LEN * sector_number);
-    fseek(bin, 0, SEEK_SET);
     fseek(bin, sector_offset, SEEK_SET);
     unsigned int ret = fread(sector_buf, 1, SECTOR_RAW_LEN, bin); // Not big endian safe.
     fseek(bin, 0, SEEK_SET); // Always seek to initial fpos as per policy of this library.
@@ -70,7 +69,6 @@ int read_sector_user_data(FILE *bin, unsigned int sector_number, unsigned char *
     }
 
     unsigned int sector_offset = (SECTOR_RAW_LEN * sector_number) + SECTOR_SYNC_HEADER_LEN;
-    fseek(bin, 0, SEEK_SET);
     fseek(bin, sector_offset, SEEK_SET);
     unsigned int ret = fread(sector_buf, 1, SECTOR_USER_DATA_LEN, bin); // Not big endian safe.
     fseek(bin, 0, SEEK_SET); // Always seek to initial fpos as per policy of this library.
@@ -93,7 +91,6 @@ int read_sector_edc(FILE *bin, unsigned int sector_number, unsigned char * secto
     }
 
     unsigned int sector_offset = (SECTOR_RAW_LEN * sector_number) + (SECTOR_SYNC_HEADER_LEN + SECTOR_USER_DATA_LEN);
-    fseek(bin, 0, SEEK_SET);
     fseek(bin, sector_offset, SEEK_SET);
     unsigned int ret = fread(sector_buf, 1, SECTOR_EDC_LEN, bin); // Not big endian safe.
     fseek(bin, 0, SEEK_SET); // Always seek to initial fpos as per policy of this library.
@@ -116,7 +113,6 @@ int read_sector_ecc(FILE *bin, unsigned int sector_number, unsigned char * secto
     }
 
     unsigned int sector_offset = (SECTOR_RAW_LEN * sector_number) + (SECTOR_SYNC_HEADER_LEN + SECTOR_USER_DATA_LEN + SECTOR_EDC_LEN);
-    fseek(bin, 0, SEEK_SET);
     fseek(bin, sector_offset, SEEK_SET);
     unsigned int ret = fread(sector_buf, 1, SECTOR_ECC_LEN, bin); // Not big endian safe.
     fseek(bin, 0, SEEK_SET); // Always seek to initial fpos as per policy of this library.
@@ -127,6 +123,200 @@ int read_sector_ecc(FILE *bin, unsigned int sector_number, unsigned char * secto
     } else {
         return 0;
     }
+}
+
+int write_sector_user_data(FILE *bin, unsigned int sector_number, unsigned char * sector_buf)
+{
+    unsigned int sector_sum = total_number_of_sectors(bin);
+
+    if(sector_sum < sector_number)
+    {
+        return 2;
+    }
+
+    unsigned int sector_offset = (SECTOR_RAW_LEN * sector_number) + SECTOR_SYNC_HEADER_LEN;
+    fseek(bin, sector_offset, SEEK_SET);
+    unsigned int ret = fwrite(sector_buf, 1, SECTOR_USER_DATA_LEN, bin); // Not big endian safe.
+    fseek(bin, 0, SEEK_SET); // Always seek to initial fpos as per policy of this library.
+
+    if(ret == SECTOR_USER_DATA_LEN)
+    {
+        return 1;
+    } else {
+        return 0;
+    }
+}
+
+int sector_boundary_aware_find_and_replace(FILE *bin,
+    unsigned int sector_to_scan, // Sector to start pattern match at.
+
+    const unsigned char *pattern, // Unsigned char array of bytes to be matched.
+    int pattern_len, // Length of unsigned char array of bytes to be matched.
+
+    bool contains_unmatchable_bytes, // (Optional) boolean, allows the unsigned char array of bytes to be matched to ignore some offsets. These bytes may still be patched, but they don't have to match.
+
+    const unsigned char *unmatchable_byte_offsets, // (Optional) list of offsets in the unsigned char array of bytes to be matched that must be ignored because they can not be reliably identified. These bytes may still be patched, but they don't have to match.
+    int unmatchable_byte_offsets_len, // (Optional) Length of the list of offsets in the unsigned char array of bytes to be matched that must be ignored because they can not be reliably identified. These bytes may still be patched, but they don't have to match.
+    
+    const unsigned char *patch, // Unsigned char array of bytes that will replace the pattern unsigned char array.
+    int patch_len, // Length of unsigned char array of bytes that will replace the pattern unsigned char array.
+
+    const unsigned char *ignored_byte_offsets, // (Optional) list of bytes that will not be modified by the patch but are matched by the pattern.
+    int ignored_byte_offsets_len) // (Optional) lenght of of list of bytes that will not be modified by the patch but are matched by the pattern.
+{
+
+/*
+    The pattern related could possibly start on the end of a sector and end at the beginning of the next sector. Each RAW sector is 0x930 bytes. The first 0x18 bytes are to be ignored as they are just header data. The next 0x800 bytes contains actual data we want to scan through.
+    Start at 0. Skip to 0x18. Read the next 0x800 bytes. Skip to a total of 0x930 bytes (one whole raw sector). Skip 0x18 bytes again and then read the next 0x800 bytes. We now have 2 sectors worth of straight up data in a buffer of 0x1000 bytes
+    Run search functions on the 0x1000 byte sized buffer.
+*/
+
+    #ifdef DEBUG
+        printf("\nDEBUG: INPUT PATTERN:\n");
+        for (int i = 0; i < pattern_len; i++) {
+            printf("02%x\n", pattern[i]);
+        }
+
+        printf("\nDEBUG: INPUT PATTERN UNMATCHABLE OFFSETS:\n");
+
+        for (int i = 0; i < unmatchable_byte_offsets_len; i++) {
+            printf("%d\n", unmatchable_byte_offsets[i]);
+        }
+
+        printf("\nDEBUG: INPUT PATCH:\n");
+
+        for (int i = 0; i < patch_len; i++) {
+            printf("%d\n", patch[i]);
+        }
+
+        printf("\nDEBUG: INPUT PATCH IGNORED BYTE OFFSETS:\n");
+
+        for (int i = 0; i < ignored_byte_offsets_len; i++) {
+            printf("%d\n", ignored_byte_offsets[i]);
+        }
+    #endif
+
+    // Sanity checks
+    unsigned int sector_count = total_number_of_sectors(bin);
+
+    if(sector_to_scan > sector_count)
+    {
+        return 2; // Sector doesn't exist.
+    }
+
+    if(pattern_len > SECTOR_USER_DATA_LEN)
+    {
+        return 3; // Pattern is too large
+    }
+
+    unsigned char ignored_byte = 0;
+    unsigned int patched_sector; // Tells us what sector/LBA pattern/patch was applied to.
+    unsigned char sectors_buf[(SECTOR_USER_DATA_LEN * 2)]; // Buffer max size is two user datas stitched together.
+    int pattern_search_size = 0;
+    int pattern_match_count = 0; // If it is greater then 1 by the end this func returns 1 for success. If it is still 0 return 0.
+
+    if(sector_to_scan >= sector_count - 1) // Is the last sector.
+    {
+        read_sector_user_data(bin, sector_to_scan, sectors_buf);
+        pattern_search_size = SECTOR_USER_DATA_LEN;
+    } else {
+        pattern_search_size = (SECTOR_USER_DATA_LEN * 2);
+        read_sector_user_data(bin, sector_to_scan, sectors_buf);
+        read_sector_user_data(bin, (sector_to_scan + 1), &sectors_buf[SECTOR_USER_DATA_LEN]); // Put it at 0x800
+    }
+
+// So now we have 2 user data portions of consecutive sectors, or just one. Either way, we can just scan through it without worrying about sync headers, EDC, or ECC boundaries messing up a pattern match.
+
+    for(int sector_byte_offset = 0; sector_byte_offset <= (pattern_search_size - pattern_len); sector_byte_offset++)
+    {
+        bool matched_pattern = true; // Set to false if no match is found.
+
+        for(int pattern_byte_offset = 0; pattern_byte_offset < pattern_len; pattern_byte_offset++) // For length of pattern.
+        {                
+            if(pattern[pattern_byte_offset] != sectors_buf[sector_byte_offset + pattern_byte_offset]) // Did not match pattern, check if this is an unmatchable byte we want to ignore.
+            {
+                if(contains_unmatchable_bytes) // Optional unmatchable bytes flag set.
+                {
+                    bool is_unmatchable_byte = false;
+
+                    for(int unmatchable_byte_offset = 0; unmatchable_byte_offset < unmatchable_byte_offsets_len; unmatchable_byte_offset++) // Go through unmatchable byte pattern.
+                    {
+                        if(pattern_byte_offset == unmatchable_byte_offsets[unmatchable_byte_offset]) // If this offset is an unmatchable byte offset (offset starts at first byte of pattern to match with, that always lines up).
+                        {
+                            is_unmatchable_byte = true; // We are not going to say the match failed since this byte was specified to be unmatchable.
+                            break;
+                        }
+                    }
+
+                    if(!is_unmatchable_byte) // The only thing that could have saved this match is if it was unmatchable
+                    {
+                        matched_pattern = false;
+                    }
+                } else { // The begining if statement has this as a non-match.
+                    matched_pattern = false;
+                }
+            }
+        }
+
+        if(matched_pattern)
+        {
+            if(sector_byte_offset < SECTOR_USER_DATA_LEN) // We are in the 1st sector's user data.
+            {
+                patched_sector = sector_to_scan;
+            } else { // We are in the second sector's user data.
+                patched_sector = (sector_to_scan + 1);
+            }
+            
+            printf("\rGot a pattern code match starting in sector %d (LBA: %u)\n", patched_sector, (patched_sector + PREGAP));
+
+            int ignored_byte_offset_counter = 0;
+
+            for(int i = 0; i < patch_len; i++)
+            {                
+                if(contains_unmatchable_bytes && 
+                ignored_byte_offset_counter < ignored_byte_offsets_len &&
+                i == ignored_byte_offsets[ignored_byte_offset_counter])
+                {
+                    // Skip this byte as it doesn't need to be patched.
+                    ignored_byte_offset_counter++;
+                } else {
+                    sectors_buf[sector_byte_offset + i] = patch[i]; // patch normally
+                }
+            }
+
+            pattern_match_count++;
+        }
+    }
+
+    #ifdef DEBUG
+        printf("\nDEBUG: sector search complete.\n");
+    #endif
+
+    // Write it back.
+    if(pattern_search_size == SECTOR_USER_DATA_LEN) // Last sector.
+    {
+        write_sector_user_data(bin, sector_to_scan, sectors_buf);
+    } else {
+        unsigned char first_sector_patched_data[SECTOR_USER_DATA_LEN]; // Need to split this up.
+
+        for(int i = 0; i < SECTOR_USER_DATA_LEN; i++)
+        {
+            first_sector_patched_data[i] = sectors_buf[i];
+        }
+
+        write_sector_user_data(bin, sector_to_scan, first_sector_patched_data);
+        write_sector_user_data(bin, (sector_to_scan + 1), &sectors_buf[SECTOR_USER_DATA_LEN]); // Last 0x800 bytes in sectors_buf.
+    }
+
+    // Return
+    if(pattern_match_count > 0)
+    {
+        return 1;
+    } else {
+        return 0;
+    }
+
+    fseek(bin, 0, SEEK_SET);
 }
 
 // Now begin get_psx_exe_gameid(). Note because this is a 'parser' function it doesn't seek the file at all right now. If there were to ever arrise a volume_creation_timestamp conflict, then id_rev() could be used to destingush the file since we already require FILE *bin as first argument in lib-enigma mode. In that case, fpos would be reset to initial 0 before returing the game id for each game.
@@ -1301,334 +1491,6 @@ int id_rev(FILE *bin, const unsigned int difference_offset, const unsigned char 
     	printf("Unknown version\n");
         return 2;
 	}    
-}
-
-void bin_patch(FILE *bin,
-               const unsigned char *pattern,
-               int pattern_len,
-
-               bool contains_unmatchable_bytes,
-
-               const unsigned char *unmatchable_byte_offsets,
-               int unmatchable_byte_offsets_len,
-               
-               const unsigned char *patch,
-               int patch_len,
-
-               const unsigned char *unpatchable_byte_offsets,
-               int unpatchable_byte_offsets_len)
-    {
-
-    #ifdef DEBUG
-        printf("\nDEBUG: INPUT PATTERN:\n");
-        for (int i = 0; i < pattern_len; i++) {
-            printf("%d\n", pattern[i]);
-        }
-
-        printf("\nDEBUG: INPUT PATTERN UNMATCHABLE OFFSETS:\n");
-
-        for (int i = 0; i < unmatchable_byte_offsets_len; i++) {
-            printf("%d\n", unmatchable_byte_offsets[i]);
-        }
-
-        printf("\nDEBUG: INPUT PATCH:\n");
-
-        for (int i = 0; i < patch_len; i++) {
-            printf("%d\n", patch[i]);
-        }
-
-        printf("\nDEBUG: INPUT PATCH UNPATCHABLE OFFSETS:\n");
-
-        for (int i = 0; i < unpatchable_byte_offsets_len; i++) {
-            printf("%d\n", unpatchable_byte_offsets[i]);
-        }
-    #endif
-
-    unsigned int bin_file_size = 0;
-    unsigned int sector_count = 0;
-
-    int search_size;
-
-    bool last_sector = false;
-    bool unmatchable_byte = false;
-
-    unsigned int percentage;
-    unsigned int current_fpos = 0;
-    unsigned int pattern_match_count = 0;
-    unsigned int valid_mem_dump_size = 0x200000; // The exact file size generated when dumping RAM in the DuckStation emulator.
-    unsigned char unpatchable_byte = 0;
-    unsigned char sectors_buf[(SECTOR_RAW_LEN * 2)];
-    unsigned char *buf;
-    bool matched_pattern = false;
-    unsigned int patched_lba;
-
-    /*
-        The pattern related could possibly start on the end of a sector and end at the beginning of the next sector. Each RAW sector is 0x930 bytes. The first 0x18 bytes are to be ignored as they are just header data. The next 0x800 bytes contains actual data we want to scan through.
-        Start at 0. Skip to 0x18. Read the next 0x800 bytes. Skip to a total of 0x930 bytes (one whole raw sector). Skip 0x18 bytes again and then read the next 0x800 bytes. We now have 2 sectors worth of straight up data in a buffer of 0x1000 bytes
-        Run search functions on the 0x1000 byte sized buffer.
-    */
-
-    if(contains_unmatchable_bytes)
-    {
-        contains_unmatchable_bytes = true;
-    }
-
-    fseek(bin, 0, SEEK_END);
-    bin_file_size = ftell(bin);
-    unsigned int sector_sum = total_number_of_sectors(bin);
-
-    unsigned char sectors[(SECTOR_USER_DATA_LEN * 2)];
-    
-    printf("Scanning %d sectors, please wait...\n", sector_sum);
-    fseek(bin, 0, SEEK_SET);
-    fread(sectors_buf, 1, (SECTOR_RAW_LEN * 2), bin);
-
-    while(1)
-    {
-        if(current_fpos > bin_file_size)
-        {
-            break; // even number of sectors, done reading the file.
-        }
-            
-        if((current_fpos + SECTOR_RAW_LEN) == bin_file_size) // odd number of sectors
-        {
-            last_sector = true; // This function is reading 2 sectors at a time, so if there is an odd number of sectors we have to change the behavior to only search the last sector. Explicitly break loop when this is set.
-        }
-        
-        percentage = ( ( (sector_count + 1) * 100) / sector_sum); // + 1 to ensure it gets to 100%
-        printf("\rProgress: %d%%", percentage); // last sector so don't add + 1
-        fflush(stdout); // clear double buffered input so terminal cursor isn't going nuts
-        
-        #ifdef DEBUG
-            printf("\nDEBUG: filling user data sector buffer with user data 1\n");
-        #endif
-
-        for(int i=0; i < SECTOR_USER_DATA_LEN; i++)
-        {
-            sectors[i] = sectors_buf[i + SECTOR_SYNC_HEADER_LEN];
-        }
-
-        if(!last_sector)
-        {
-            #ifdef DEBUG
-                printf("\nDEBUG: filling user data sector buffer with user data 2\n");
-            #endif
-            
-            for(int i=0; i < SECTOR_USER_DATA_LEN; i++)
-            {
-                sectors[i + SECTOR_USER_DATA_LEN] = sectors_buf[i + SECTOR_SYNC_HEADER_LEN + SECTOR_RAW_LEN]; // skip 0x18 header info then skip exactly 1 sector. Read the next 0x800 bytes. We now have an array's worth of data from 2 sectors which excludes EDC/Header data at the beginning and end of each.
-            }
-
-            search_size = (SECTOR_USER_DATA_LEN * 2);
-        } else {
-            search_size = SECTOR_USER_DATA_LEN;
-        }
-
-        for(int s = 0; s < search_size; s++)
-        {
-            #ifdef DEBUG
-                printf("\nDEBUG: looking for matches\n");
-            #endif    
-
-            matched_pattern = true;
-
-            for(int i=0; i < pattern_len; i++)
-            {                
-                if(pattern[i] != sectors[s + i])
-                {
-                    if(contains_unmatchable_bytes)
-                    {
-                        bool is_unmatchable_byte = false;
-
-                        for(int j = 0; j < unmatchable_byte_offsets_len; j++)
-                        {
-                            if(i == unmatchable_byte_offsets[j])
-                            {
-                                is_unmatchable_byte = true;
-                                break;
-                            }
-                        }
-
-                        if(!is_unmatchable_byte)
-                        {
-                            matched_pattern = false;
-                        }
-                    } else {
-                        matched_pattern = false;
-                    }
-                }
-            }
-
-            if(matched_pattern)
-            {
-                if(s < SECTOR_USER_DATA_LEN) // if s is above 0x800 we are in the second sector's user data
-                {
-                    patched_lba = ((current_fpos / SECTOR_RAW_LEN) + PREGAP);
-                } else {
-                    patched_lba = ((current_fpos / SECTOR_RAW_LEN) + PREGAP + 1);
-                }
-                
-                printf("\rGot a pattern code match starting in sector %d (LBA: %u)\n", (patched_lba - PREGAP), patched_lba);
-                pattern_match_count++;
-                int unpatchable_byte_offset_counter = 0;
-
-                for(int i = 0; i < patch_len; i++)
-                {                
-                    if(contains_unmatchable_bytes && 
-                    unpatchable_byte_offset_counter < unpatchable_byte_offsets_len &&
-                    i == unpatchable_byte_offsets[unpatchable_byte_offset_counter])
-                    {
-                        // Skip this unpatchable byte
-                        unpatchable_byte_offset_counter++;
-                    }
-                    else
-                    {
-                        sectors[s + i] = patch[i]; // patch normally
-                    }
-                }
-            }
-        }
-
-        #ifdef DEBUG
-            printf("\nDEBUG: sector search complete.\n");
-        #endif
-
-        for(int i=0; i < SECTOR_USER_DATA_LEN; i++)
-        {
-            sectors_buf[i + SECTOR_SYNC_HEADER_LEN] = sectors[i]; // skip 0x18 header info per sector
-        }
-
-        if(!last_sector)
-        {
-            for(int i=0; i < SECTOR_USER_DATA_LEN; i++)
-            {
-                sectors_buf[i + SECTOR_SYNC_HEADER_LEN + SECTOR_RAW_LEN] = sectors[SECTOR_USER_DATA_LEN + i]; // skip 0x18 header info then skip exactly 1 sector. Read the next 0x800 bytes. We now have an array's worth of data from 2 sectors which excludes EDC/Header data at the beginning and end of each.
-            }
-        } else {
-            break; // That was the last sector
-        }
-
-        #ifdef DEBUG
-            printf("\nDEBUG: Updated sectors buff\n");
-        #endif
-
-        if(!last_sector)
-        {
-            // Go back 2 raw sectors (since we read them we moved this much fpos)
-            fseek(bin, -(SECTOR_RAW_LEN * 2), SEEK_CUR);
-            #ifdef DEBUG
-                printf("\nCurrent offset: 0x%lX\n", ftell(bin));
-            #endif
-
-            // Skip header
-            fseek(bin, SECTOR_SYNC_HEADER_LEN, SEEK_CUR);
-            #ifdef DEBUG
-                printf("\nSkipped header. Current offset: 0x%lX\n", ftell(bin));
-            #endif
-
-            // Write 0x800 bytes
-            fwrite(sectors_buf + SECTOR_SYNC_HEADER_LEN, 1, SECTOR_USER_DATA_LEN, bin);
-            #ifdef DEBUG
-                printf("\nWrote user data of 1st sector. Current offset: 0x%lX\n", ftell(bin));
-            #endif
-
-            // Skip EDC/EDC, we are currently at cur + 0x18 + 0x800
-            fseek(bin, (SECTOR_EDC_LEN + SECTOR_ECC_LEN), SEEK_CUR);
-            #ifdef DEBUG
-                printf("\nSkipped EDC/ECC. Now at next sector. Current offset: 0x%lX\n", ftell(bin));
-            #endif
-
-            // At begining of new raw sector. Skip header for new sector
-            fseek(bin, SECTOR_SYNC_HEADER_LEN, SEEK_CUR);
-            #ifdef DEBUG        
-                printf("\nSkipped header. Current offset: 0x%lX\n", ftell(bin));
-            #endif
-
-            // Write user data of second sector
-            fwrite(sectors_buf + SECTOR_RAW_LEN + SECTOR_SYNC_HEADER_LEN, 1, SECTOR_USER_DATA_LEN, bin);
-            #ifdef DEBUG
-                printf("\nWrote user data of 2nd sector. Current offset: 0x%lX\n", ftell(bin));
-            #endif
-
-            // skip EDC/EEC
-            fseek(bin, (SECTOR_EDC_LEN + SECTOR_ECC_LEN), SEEK_CUR);
-            #ifdef DEBUG
-                printf("Skipped EDC/ECC. Now at next sector. Current offset: 0x%lX\n", ftell(bin));
-            #endif
-
-            fseek(bin, -(SECTOR_RAW_LEN), SEEK_CUR);
-            #ifdef DEBUG
-                printf("Went back one raw sector for cross-user-data-boundary matching. Current offset: 0x%lX\n", ftell(bin));
-            #endif
-            /* 
-            must go back a sector to align with current_fpos, we read the disc like this to catch pattern crossing sector boundaries:
-            1) read sector 0 and 1, then
-            2) read sector 1 and 2, then
-            3) read sector 2 and 3, and so on
-            */
-
-            fread(sectors_buf, 1, (SECTOR_RAW_LEN * 2), bin); // read 2 sectors
-            #ifdef DEBUG
-                printf("\nRead 2 RAW sectors. Current offset: 0x%lX\n", ftell(bin));
-            #endif
-
-            sector_count++;
-            #ifdef DEBUG
-                printf("\nincreased sector count to %d\n", sector_count);
-            #endif
-
-            current_fpos = ftell(bin);
-            #ifdef DEBUG
-                printf("\nCurrent fpos is: 0x%02x\n", current_fpos);
-            #endif
-        } else {
-            // Go back 1 raw sector (since we read it we moved this much fpos)
-            fseek(bin, -(SECTOR_RAW_LEN), SEEK_CUR);
-            #ifdef DEBUG
-                printf("\nCurrent offset: 0x%lX\n", ftell(bin));
-            #endif
-            
-            // Skip header.
-            fseek(bin, SECTOR_SYNC_HEADER_LEN, SEEK_CUR);
-            #ifdef DEBUG
-                printf("\nSkipped header. Current offset: 0x%lX\n", ftell(bin));
-            #endif
-
-            // write 0x800 bytes of user data.
-            fwrite(sectors_buf, 1, SECTOR_RAW_LEN, bin);
-            #ifdef DEBUG
-                printf("\nWrote user data of last sector. Current offset: 0x%lX\n", ftell(bin));
-            #endif
-
-            // skip EDC/EEC
-            fseek(bin, (SECTOR_EDC_LEN + SECTOR_ECC_LEN), SEEK_CUR);
-            #ifdef DEBUG
-                printf("\nSkipped EDC/ECC. Now at end of file. Current offset: 0x%lX\n", ftell(bin));
-            #endif    
-            break;
-        }
-
-        #ifdef DEBUG
-            if(sector_count > 3)
-            {
-                return;
-            }
-            
-            sleep(10);
-        #endif
-    }
-
-    if(pattern_match_count != 1) 
-    {
-        printf("\nImage scan complete, got %d pattern code matches\n", pattern_match_count);
-    } else {
-        printf("\nImage scan complete, got 1 pattern code match\n");
-    }
-
-    if(pattern_match_count > 0)
-    {
-        printf("\nmodified successfully!\n");
-    }
 }
 
 /*

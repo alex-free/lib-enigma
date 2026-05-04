@@ -56,6 +56,8 @@ int read_sector_edc(FILE *bin, unsigned int sector_number, unsigned char * secto
 
 int read_sector_ecc(FILE *bin, unsigned int sector_number, unsigned char * sector_buf); // Read only the ecc data (repair data used during disc error repair attempts when EDC verification mismatches) into sector_buf. This excludes sync header, user data, or EDC. If requested sector does not exist (i.e. not enough sectors in disc image for sector requested), it returns 2. If it successfully reads the sector, it returns 1. If it fails to read the sector but the sector exists, it returns 0.
 
+int Write_sector_user_data(FILE *bin, unsigned int sector_number, unsigned char *sector_buf); // Write sector user data (0x800 byte array). If requested sector does not exist (i.e. not enough sectors in disc image for sector requested), it returns 2. If it successfully writes the sector data, it returns 1. If it fails to write the sector but the sector exists, it returns 0.
+
 // Identification functions.
 const char * get_psx_exe_gameid(FILE *bin, char *volume_creation_timestamp);
 int is_ps_cd(FILE *bin); // returns 1 if `bin` is a PlayStation 1 or 2 CD image in MODE2/2352 format. Returns 0 if it is not. Should be called before any of the functions below.
@@ -73,20 +75,24 @@ int cdr_minimum_requirement(FILE *bin); // Returns 0 if the bin file will fit on
 unsigned int total_number_of_sectors(FILE *bin); // Returns the number of sectors in a disc image.
 
 // Patching functions.
-void bin_patch(FILE *bin,
-               const unsigned char *pattern,
-               int pattern_len,
+int sector_boundary_aware_find_and_replace(FILE *bin,
+    unsigned int sector_to_scan, // Sector to start pattern match at.
 
-               bool contains_unmatchable_bytes,
-               
-               const unsigned char *unmatchable_byte_offsets,
-               int unmatchable_byte_offsets_len,
-               
-               const unsigned char *patch,
-               int patch_len,
+    const unsigned char *pattern, // Unsigned char array of bytes to be matched.
+    int pattern_len, // Length of unsigned char array of bytes to be matched.
 
-               const unsigned char *unpatchable_byte_offsets,
-               int unpatchable_byte_offsets_len); // Custom 'Lossy' Patching by myself. Applies lossy patch (no hardcoded offsets). Unmatchable bytes is optional, please see example 3 for implementation details: https://github.com/alex-free/lib-enigma/tree/master/example-3-piracy-patcher
+    bool contains_unmatchable_bytes, // (Optional) boolean, allows the unsigned char array of bytes to be matched to ignore some offsets. These bytes may still be patched, but they don't have to match.
+
+    const unsigned char *unmatchable_byte_offsets, // (Optional) list of offsets in the unsigned char array of bytes to be matched that must be ignored because they can not be reliably identified. These bytes may still be patched, but they don't have to match.
+    int unmatchable_byte_offsets_len, // (Optional) Length of the list of offsets in the unsigned char array of bytes to be matched that must be ignored because they can not be reliably identified. These bytes may still be patched, but they don't have to match.
+    
+    const unsigned char *patch, // Unsigned char array of bytes that will replace the pattern unsigned char array.
+    int patch_len, // Length of unsigned char array of bytes that will replace the pattern unsigned char array.
+
+    const unsigned char *ignored_byte_offsets, // (Optional) list of bytes that will not be modified by the patch but are matched by the pattern.
+    int ignored_byte_offsets_len); // (Optional) lenght of of list of bytes that will not be modified by the patch but are matched by the pattern.
+
+// Returns 0 if no match found. Returns 1 if at least one match was found. Returns 2 if the requested sector is out of bounds and doesn't exist. Returns 3 if the patch is too large to be used.
 
 void apply_ppf(const unsigned char ppf[], unsigned int ppf_len, FILE *bin); // Apply PlayStation Patch File patch from unsigned char array.
 

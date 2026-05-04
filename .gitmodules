@@ -1,0 +1,3 @@
+[submodule "ezre"]
+	path = ezre
+	url = https://github.com/alex-free/ezre

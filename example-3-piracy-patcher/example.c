@@ -88,7 +88,7 @@ const unsigned char libcrypt_1_medievil_icepick_based_patch_pattern[] = {
 }; // 0x2F, 47 bytes
 
 // ICEPICK patch from TRSIMEDI, modified for aprip
-const unsigned char libcrypt_1_medievil_icepick_based_patch[] = {
+unsigned char libcrypt_1_medievil_icepick_based_patch[] = {
     0x00, // 0
     0x00, // not a value checked // 1
     0x00, // 2
@@ -134,7 +134,7 @@ const unsigned char libcrypt_1_medievil_icepick_based_patch[] = {
     0x00, // 42
     0x00, // 43
     0xAA, // byte 2 of MW // 44
-    0x87, // byte 1 of MW // 45 // Magic word is AA87 for Europe
+    0x87, // byte 1 of MW // 45 // Magic word is AA87 for Europe. For other regions, change byte 44 and 45.
     0x04, // 46
     0x24 // 47
 }; // 0x2F, 47 bytes
@@ -157,7 +157,7 @@ const unsigned char libcrypt_1_medievil_icepick_based_patch_pattern_unmatchable_
     45
 };
 
-const unsigned char libcrypt_1_medievil_icepick_based_patch_pattern_unpatchable_offsets[] = {
+const unsigned char libcrypt_1_medievil_icepick_based_patch_pattern_ignored_offsets[] = {
     1,
     4,
     5,
@@ -180,7 +180,7 @@ int main (int argc, const char * argv[])
     
     if(argc != 2) 
     {
-        printf("Error: incorrect number of arguments\n\nUsage:\nmedip <MediEvil (Europe) .bin file>\n");
+        printf("Error: incorrect number of arguments\n\nUsage:\npsxpiracyp <.bin file>\n");
         return 1;
     }
 
@@ -202,51 +202,191 @@ int main (int argc, const char * argv[])
     } else if(valid) {
         int got_boot_file = get_boot_file_name(bin, boot_file);
         //printf("boot file: %s\n", boot_file);
+        unsigned int sector_count = total_number_of_sectors(bin);
 
         if(got_boot_file == 1) // Successfully found boot file.
-        {
-            printf("MediEvil (Europe) detected, patching LibCrypt v1 protection...\n");
-            if((strncmp(boot_file, "SCES_003.11", 11) == 0)) {// /MediEvil (Europe)
-                // Pattern contains unmatchable bytes:
-                // bin_patch(bin_file, pattern, 1, unmatchable_byte_offsets, patch, unpatchable_bytes, unpatchable_byte_offsets)
-                // Pattern contains only matchable bytes:
-                // bin_match(bin_file, pattern, 0, 0, patch, 0, 0)
-                bin_patch(
-                          bin,                                                      // FILE *
-                          
-                          libcrypt_1_medievil_icepick_based_patch_pattern,          // pattern
-                          sizeof(libcrypt_1_medievil_icepick_based_patch_pattern),  // pattern_len
-                          
-                          true,                                                     // contains_unmatchable_bytes
-                          
-                          libcrypt_1_medievil_icepick_based_patch_pattern_unmatchable_offsets,  // offsets
-                          sizeof(libcrypt_1_medievil_icepick_based_patch_pattern_unmatchable_offsets), // offsets_len
-                          
-                          libcrypt_1_medievil_icepick_based_patch,                  // patch
-                          sizeof(libcrypt_1_medievil_icepick_based_patch),           // patch_len
-                          
-                          libcrypt_1_medievil_icepick_based_patch_pattern_unpatchable_offsets,
-                          sizeof(libcrypt_1_medievil_icepick_based_patch_pattern_unpatchable_offsets)
-                          );
+        {            
+            if((strncmp(boot_file, "SCES_003.11", 11) == 0)) 
+            {// /MediEvil (Europe)
+                // Magic word is 87AA: https://web.archive.org/web/20220710184013/https://www.psdevwiki.com/ps3/PS1_Custom_Patches. 
+                // Magic word is already in patch.
+                // Unpatched MD5: 6d222937049c7ef56caa0994b0246790
+                // Patched MD5: 29589f79d81bf604cfac7f2c53b3f7ac
+                printf("MediEvil (Europe) detected, patching LibCrypt v1 protection...\n");
+
+                for(unsigned int i = 0; i < sector_count; i++)
+                {
+                    sector_boundary_aware_find_and_replace(
+                                bin,                                                      // FILE *
+                                
+                                i,                                                        // sector to check
+                                
+                                libcrypt_1_medievil_icepick_based_patch_pattern,          // pattern
+                                sizeof(libcrypt_1_medievil_icepick_based_patch_pattern),  // pattern_len
+                                
+                                true,                                                     // contains_unmatchable_bytes
+                                
+                                libcrypt_1_medievil_icepick_based_patch_pattern_unmatchable_offsets,  // offsets
+                                sizeof(libcrypt_1_medievil_icepick_based_patch_pattern_unmatchable_offsets), // offsets_len
+                                
+                                libcrypt_1_medievil_icepick_based_patch,                  // patch
+                                sizeof(libcrypt_1_medievil_icepick_based_patch),           // patch_len
+                                
+                                libcrypt_1_medievil_icepick_based_patch_pattern_ignored_offsets,
+                                sizeof(libcrypt_1_medievil_icepick_based_patch_pattern_ignored_offsets)
+                                );
+                }
+
+            } else if((strncmp(boot_file, "SCES_014.92", 11) == 0)) {// MediEvil (France)
+                // Magic word is D16A: https://web.archive.org/web/20220710184013/https://www.psdevwiki.com/ps3/PS1_Custom_Patches.
+                // Need to update patch from MediEvil (Europe) magic word to MediEvil (France) magic word.
+                libcrypt_1_medievil_icepick_based_patch[44] = 0x6A; 
+                libcrypt_1_medievil_icepick_based_patch[45] = 0xD1; 
+                // Unpatched MD5: 369d0141020d017fdb09b16b2c1900b7
+                // Patched MD5: 31bbb0474e10bc0f69da4341eb9d7ea0
+                printf("MediEvil (France) detected, patching LibCrypt v1 protection...\n");
+
+                for(unsigned int i = 0; i < sector_count; i++)
+                {
+                    sector_boundary_aware_find_and_replace(
+                                bin,                                                      // FILE *
+                                
+                                i,                                                        // sector to check
+                                
+                                libcrypt_1_medievil_icepick_based_patch_pattern,          // pattern
+                                sizeof(libcrypt_1_medievil_icepick_based_patch_pattern),  // pattern_len
+                                
+                                true,                                                     // contains_unmatchable_bytes
+                                
+                                libcrypt_1_medievil_icepick_based_patch_pattern_unmatchable_offsets,  // offsets
+                                sizeof(libcrypt_1_medievil_icepick_based_patch_pattern_unmatchable_offsets), // offsets_len
+                                
+                                libcrypt_1_medievil_icepick_based_patch,                  // patch
+                                sizeof(libcrypt_1_medievil_icepick_based_patch),           // patch_len
+                                
+                                libcrypt_1_medievil_icepick_based_patch_pattern_ignored_offsets,
+                                sizeof(libcrypt_1_medievil_icepick_based_patch_pattern_ignored_offsets)
+                                );
+                }
+           } else if((strncmp(boot_file, "SCES_014.93", 11) == 0)) {// MediEvil (Germany)
+                // Magic word is 197A: https://web.archive.org/web/20220710184013/https://www.psdevwiki.com/ps3/PS1_Custom_Patches.
+                // Need to update patch from MediEvil (Europe) magic word to MediEvil (Germany) magic word.
+                libcrypt_1_medievil_icepick_based_patch[44] = 0x7A; 
+                libcrypt_1_medievil_icepick_based_patch[45] = 0x19; 
+                // Unpatched MD5: fa7e2bb143267bbb8f69983cf811d686
+                // Patched MD5: c90fb57cdfce48b5e44d47947dd8d769
+                printf("MediEvil (Germany) detected, patching LibCrypt v1 protection...\n");
+
+                for(unsigned int i = 0; i < sector_count; i++)
+                {
+                    sector_boundary_aware_find_and_replace(
+                                bin,                                                      // FILE *
+                                
+                                i,                                                        // sector to check
+                                
+                                libcrypt_1_medievil_icepick_based_patch_pattern,          // pattern
+                                sizeof(libcrypt_1_medievil_icepick_based_patch_pattern),  // pattern_len
+                                
+                                true,                                                     // contains_unmatchable_bytes
+                                
+                                libcrypt_1_medievil_icepick_based_patch_pattern_unmatchable_offsets,  // offsets
+                                sizeof(libcrypt_1_medievil_icepick_based_patch_pattern_unmatchable_offsets), // offsets_len
+                                
+                                libcrypt_1_medievil_icepick_based_patch,                  // patch
+                                sizeof(libcrypt_1_medievil_icepick_based_patch),           // patch_len
+                                
+                                libcrypt_1_medievil_icepick_based_patch_pattern_ignored_offsets,
+                                sizeof(libcrypt_1_medievil_icepick_based_patch_pattern_ignored_offsets)
+                                );
+                }
+           } else if((strncmp(boot_file, "SCES_014.94", 11) == 0)) {// MediEvil (Italy)
+                // Magic word is AAA6: https://web.archive.org/web/20220710184013/https://www.psdevwiki.com/ps3/PS1_Custom_Patches.
+                // Need to update patch from MediEvil (Europe) magic word to MediEvil (Italy) magic word.
+                libcrypt_1_medievil_icepick_based_patch[44] = 0xA6; 
+                libcrypt_1_medievil_icepick_based_patch[45] = 0xAA; 
+                // Unpatched MD5: be429f46f83dfb55d51d45385ea92eee
+                // Patched MD5: e3268ff369e87401480fefb6e9734628
+                printf("MediEvil (Italy) detected, patching LibCrypt v1 protection...\n");
+
+                for(unsigned int i = 0; i < sector_count; i++)
+                {
+                    sector_boundary_aware_find_and_replace(
+                                bin,                                                      // FILE *
+                                
+                                i,                                                        // sector to check
+                                
+                                libcrypt_1_medievil_icepick_based_patch_pattern,          // pattern
+                                sizeof(libcrypt_1_medievil_icepick_based_patch_pattern),  // pattern_len
+                                
+                                true,                                                     // contains_unmatchable_bytes
+                                
+                                libcrypt_1_medievil_icepick_based_patch_pattern_unmatchable_offsets,  // offsets
+                                sizeof(libcrypt_1_medievil_icepick_based_patch_pattern_unmatchable_offsets), // offsets_len
+                                
+                                libcrypt_1_medievil_icepick_based_patch,                  // patch
+                                sizeof(libcrypt_1_medievil_icepick_based_patch),           // patch_len
+                                
+                                libcrypt_1_medievil_icepick_based_patch_pattern_ignored_offsets,
+                                sizeof(libcrypt_1_medievil_icepick_based_patch_pattern_ignored_offsets)
+                                );
+                }
+           } else if((strncmp(boot_file, "SCES_014.95", 11) == 0)) {// MediEvil (Spain)
+                // Magic word is 0E57: https://web.archive.org/web/20220710184013/https://www.psdevwiki.com/ps3/PS1_Custom_Patches.
+                // Need to update patch from MediEvil (Europe) magic word to MediEvil (Spain) magic word.
+                libcrypt_1_medievil_icepick_based_patch[44] = 0x57; 
+                libcrypt_1_medievil_icepick_based_patch[45] = 0x0E; 
+                // Unpatched MD5: 6b0e7ececa92577ba2d775f7727c4adc
+                // Patched MD5: 5c598c6ade8bc00998d9f390a093d364
+                printf("MediEvil (Spain) detected, patching LibCrypt v1 protection...\n");
+
+                for(unsigned int i = 0; i < sector_count; i++)
+                {
+                    sector_boundary_aware_find_and_replace(
+                                bin,                                                      // FILE *
+                                
+                                i,                                                        // sector to check
+                                
+                                libcrypt_1_medievil_icepick_based_patch_pattern,          // pattern
+                                sizeof(libcrypt_1_medievil_icepick_based_patch_pattern),  // pattern_len
+                                
+                                true,                                                     // contains_unmatchable_bytes
+                                
+                                libcrypt_1_medievil_icepick_based_patch_pattern_unmatchable_offsets,  // offsets
+                                sizeof(libcrypt_1_medievil_icepick_based_patch_pattern_unmatchable_offsets), // offsets_len
+                                
+                                libcrypt_1_medievil_icepick_based_patch,                  // patch
+                                sizeof(libcrypt_1_medievil_icepick_based_patch),           // patch_len
+                                
+                                libcrypt_1_medievil_icepick_based_patch_pattern_ignored_offsets,
+                                sizeof(libcrypt_1_medievil_icepick_based_patch_pattern_ignored_offsets)
+                                );
+                }              
             } else { // Detect APv2 protection.
                 printf("Searching for Anti-Piracy v2 (APv2) protection. If found this patch will ONLY allow stock consoles without a mod-chip that use a soft-mod to play them\n");
-                bin_patch(
-                          bin, // FILE *
-                          
-                          anti_piracy_v2_vc0_bypass_pattern,// pattern
-                          sizeof(anti_piracy_v2_vc0_bypass_pattern),// pattern_len
-                          
-                          false,// contains_unmatchable_bytes
-                          
-                          0,  // offsets
-                          0, // offsets_len
-                          
-                          anti_piracy_v2_vc0_bypass_patch, // patch
-                          sizeof(anti_piracy_v2_vc0_bypass_patch), // patch_len
-                          
-                          0, // unpatchable offsets array
-                          0 // unpatchable offsets len
-                          );
+                
+                
+                for(unsigned int i = 0; i < sector_count; i++)
+                {
+                    sector_boundary_aware_find_and_replace(
+                                bin,                                                      // FILE *
+                                
+                                i,                                                        // sector to check
+                                
+                                anti_piracy_v2_vc0_bypass_pattern,          // pattern
+                                sizeof(anti_piracy_v2_vc0_bypass_pattern),  // pattern_len
+                                
+                                false,                                                     // contains_unmatchable_bytes
+                                
+                                0,  // unpatchable offsets len (unused in this example)
+                                0, // unpatchable offsets_len (unused in this example)
+                                
+                                anti_piracy_v2_vc0_bypass_patch,                  // patch
+                                sizeof(anti_piracy_v2_vc0_bypass_patch),           // patch_len
+                                
+                                0, // unpatchable offsets array (unused in this example)
+                                0 // unpatchable offsets len (unused in this example)
+                                );
+                }
             }
         }
 
