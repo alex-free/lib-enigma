@@ -1,5 +1,5 @@
 Name: psx-bin-boot-file-printer       
-Version: v1.0.3
+Version: v1.0.4
 Summary: Prints boot file name of a PSX CD image.
 Release: 1
 License: 3-BSD

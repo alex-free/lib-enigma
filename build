@@ -1,0 +1,70 @@
+#!/bin/bash
+
+# EzRe build script
+# Update this to update all example version numbers.
+version=1.0.4
+program=lib-enigma
+release_name="$program-v$version"
+release_files="build-lib-enigma* lib-enigma.h lib-enigma.c *.md"
+
+cd "$(dirname "$0")"
+
+rm -rf all-examples "$release_name" "$release_name".zip lib-enigma-host lib-enigma-host-32-bit lib-enigma-mac-os lib-enigma-mac-os-legacy lib-enigma-windows-i686 lib-enigma-windows-x86_64
+# Clean examples.
+make -C example-1-boot-file-printer clean-build
+make -C example-2-kings-field-1-english-translation-patcher clean-build
+make -C example-3-piracy-patcher clean-build
+make -C example-4-sector-viewer clean-build
+
+if [ "$1" == "clean" ]; then
+    exit 0
+fi
+
+# Make zip.
+mkdir "$release_name"
+cp -r ${release_files} "$release_name"
+
+chmod -R 777 "$release_name"
+zip -r "$release_name".zip "$release_name"
+rm -rf "$release_name"
+
+if sed --version >/dev/null 2>&1; then
+    echo "Info: using GNU sed"
+    bsd_sed=false
+else
+    echo "Info: using BSD sed"
+    bsd_sed=true
+fi
+
+# Update example version numbers.
+if [ "$bsd_sed" == "true" ]; then
+    sed -i '' -E "s|^VERSION=.*|VERSION=$version|" example-1-boot-file-printer/variables.mk
+    sed -i '' -E "s|^VERSION=.*|VERSION=$version|" example-2-kings-field-1-english-translation-patcher/variables.mk
+    sed -i '' -E "s|^VERSION=.*|VERSION=$version|" example-3-piracy-patcher/variables.mk
+    sed -i '' -E "s|^VERSION=.*|VERSION=$version|" example-4-sector-viewer/variables.mk
+else
+    sed -i'' -E "s|^VERSION=.*|VERSION=$version|" example-1-boot-file-printer/variables.mk
+    sed -i'' -E "s|^VERSION=.*|VERSION=$version|" example-2-kings-field-1-english-translation-patcher/variables.mk
+    sed -i'' -E "s|^VERSION=.*|VERSION=$version|" example-3-piracy-patcher/variables.mk
+    sed -i'' -E "s|^VERSION=.*|VERSION=$version|" example-4-sector-viewer/variables.mk
+fi
+
+(cd example-1-boot-file-printer && ../ezre/ezre -y)
+(cd example-2-kings-field-1-english-translation-patcher && ../ezre/ezre -y)
+(cd example-3-piracy-patcher && ../ezre/ezre -y)
+(cd example-4-sector-viewer && ../ezre/ezre -y)
+
+# Build examples
+make -C example-1-boot-file-printer deps all
+make -C example-2-kings-field-1-english-translation-patcher all
+make -C example-3-piracy-patcher all
+make -C example-4-sector-viewer all
+
+mkdir all-examples
+cp -rv example-1-boot-file-printer/build/*.rpm example-1-boot-file-printer/build/*.deb example-1-boot-file-printer/build/*.zip all-examples
+
+cp -rv example-2-kings-field-1-english-translation-patcher/build/*.rpm example-2-kings-field-1-english-translation-patcher/build/*.deb example-2-kings-field-1-english-translation-patcher/build/*.zip all-examples
+
+cp -rv example-3-piracy-patcher/build/*.rpm example-3-piracy-patcher/build/*.deb example-3-piracy-patcher/build/*.zip all-examples
+
+cp -rv example-4-sector-viewer/build/*.rpm example-4-sector-viewer/build/*.deb example-4-sector-viewer/build/*.zip all-examples

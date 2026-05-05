@@ -4,7 +4,7 @@
 # REQUIRED: executable name in release (.exe file extension is appended for Windows builds). I.e. hello.
 PROGRAM=kfeng
 # REQUIRED: Version number, passed as 'VERSION' string to $(SOURCE_FILES). I.e. 1.0. Prepended with a v.
-VERSION=1.0.3
+VERSION=1.0.4
 # REQUIRED: source files to be compiled into $(PROGRAM) target. Can use wildcard (i.e. *.c, *.cpp, etc) or specify files specifically. These files are looked for in the same directory that the EZRE `Makefile` and `variables.mk` files are in (relative).
 SOURCE_FILES=example.c
 

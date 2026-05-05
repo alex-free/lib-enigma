@@ -1,5 +1,5 @@
 Name: kings-field-eng-translation-patcher       
-Version: v1.0.3
+Version: v1.0.4
 Summary: Translates the original Japanese release of
 Release: 1
 License: 3-BSD
